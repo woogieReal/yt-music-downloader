@@ -27,7 +27,7 @@ def get_base_ydl_opts() -> Dict[str, Any]:
             'preferredquality': '192',
         }],
         # Template will be set in download_media depending on if it is a playlist or not
-        'restrictfilenames': True,  # Securely sanitize filenames
+        # 'restrictfilenames': True,  # Removes spaces and non-ASCII characters
         'quiet': True,
         'no_warnings': True,
         'ignoreerrors': True, # Skip unavailable videos
