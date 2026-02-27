@@ -45,7 +45,8 @@ def download_media(url: str, info_dict: Dict[str, Any]) -> None:
     
     # Set outtmpl dynamically
     if 'entries' in info_dict:
-        ydl_opts['outtmpl'] = '%(playlist_index)s - %(title)s.%(ext)s'
+        # Create a folder named after the playlist
+        ydl_opts['outtmpl'] = '%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s'
     else:
         ydl_opts['outtmpl'] = '%(title)s.%(ext)s'
     
