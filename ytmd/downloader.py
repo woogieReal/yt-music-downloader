@@ -14,9 +14,18 @@ class ID3TagPostProcessor(PostProcessor):
             from mutagen.easyid3 import EasyID3
             from mutagen.id3 import ID3NoHeaderError
             
-            # 1. Metadata Extraction (Title & Artist)
+            # 1. Metadata Extraction (Title, Artist, Album, Year, Track)
             title = info.get('title')
             artist = info.get('artist')
+            album = info.get('album') or info.get('playlist_title')
+            track_number = info.get('playlist_index') or info.get('track_number')
+            
+            # Year logic: release_year first, then fallback to upload_date (YYYYMMDD)
+            year = info.get('release_year')
+            if not year and info.get('upload_date'):
+                upload_date = str(info.get('upload_date'))
+                if len(upload_date) >= 4:
+                    year = upload_date[:4]
             
             # Fallback for Title
             if not title:
@@ -40,12 +49,24 @@ class ID3TagPostProcessor(PostProcessor):
             audio['title'] = title
             if artist:
                 audio['artist'] = artist
+            if album:
+                audio['album'] = album
+            if year:
+                audio['date'] = str(year)
+            if track_number:
+                audio['tracknumber'] = str(track_number)
                 
             audio.save()
             from rich import print
             tag_status = f"Title: {title}"
             if artist:
                 tag_status += f", Artist: {artist}"
+            if album:
+                tag_status += f", Album: {album}"
+            if year:
+                tag_status += f", Year: {year}"
+            if track_number:
+                tag_status += f", Track: {track_number}"
             print(f"[bold green]Applied ID3 tags (from metadata): {tag_status}[/bold green]")
             
         return [], info
