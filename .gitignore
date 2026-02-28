@@ -36,3 +36,10 @@ ENV/
 *.webm
 *.part
 *.temp
+
+# mac
+.DS_Store
+
+# album art
+*.webp
+*.jpg
