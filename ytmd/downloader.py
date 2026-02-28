@@ -1,5 +1,54 @@
 import yt_dlp
+from yt_dlp.postprocessor.common import PostProcessor
 from typing import Dict, Any
+import os
+import re
+
+class ID3TagPostProcessor(PostProcessor):
+    def __init__(self, downloader=None):
+        super().__init__(downloader)
+
+    def run(self, info):
+        filepath = info.get('filepath')
+        if filepath and filepath.endswith('.mp3'):
+            from mutagen.easyid3 import EasyID3
+            from mutagen.id3 import ID3NoHeaderError
+            
+            # 1. Metadata Extraction (Title & Artist)
+            title = info.get('title')
+            artist = info.get('artist')
+            
+            # Fallback for Title
+            if not title:
+                filename = os.path.basename(filepath)
+                basename = os.path.splitext(filename)[0]
+                title = re.sub(r'^\d+\s*-\s*', '', basename)
+            
+            try:
+                audio = EasyID3(filepath)
+            except ID3NoHeaderError:
+                import mutagen
+                audio = mutagen.File(filepath, easy=True)
+                audio.add_tags()
+                audio = EasyID3(filepath)
+            except Exception as e:
+                from rich import print
+                print(f"[bold red]Failed to read ID3 tags from {filepath}: {e}[/bold red]")
+                return [], info
+            
+            # Apply Tags
+            audio['title'] = title
+            if artist:
+                audio['artist'] = artist
+                
+            audio.save()
+            from rich import print
+            tag_status = f"Title: {title}"
+            if artist:
+                tag_status += f", Artist: {artist}"
+            print(f"[bold green]Applied ID3 tags (from metadata): {tag_status}[/bold green]")
+            
+        return [], info
 
 def fetch_info(url: str) -> Dict[str, Any]:
     """
@@ -69,6 +118,7 @@ def download_media(url: str, info_dict: Dict[str, Any]) -> None:
     try:
         with progress_manager:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.add_post_processor(ID3TagPostProcessor(downloader=ydl), when='post_process')
                 ydl.download([url])
     except Exception as e:
         from rich import print
