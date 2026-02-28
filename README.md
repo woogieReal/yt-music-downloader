@@ -5,6 +5,7 @@ Python으로 작성된 모던하고 깔끔한 CLI 기반 유튜브 오디오 다
 ## ✨ 주요 기능
 
 - **고음질 오디오 추출**: 자동으로 최상위 품질의 오디오 포맷을 다운로드하여 `192kbps` MP3로 자동 변환합니다.
+- **ID3 태그 자동 입력**: `mutagen`을 사용하여 다운로드된 MP3 파일에 메타데이터를 자동으로 입력합니다. (Title, Artist, Album, Year, Track Number)
 - **앨범 자켓 자동 삽입**: 유튜브 영상의 썸네일을 추출하여 다운로드된 MP3 파일에 앨범 자켓(표지 이미지)으로 자동 삽입합니다.
 - **단일 영상 & 플레이리스트 지원**:
   - 단일 영상 다운로드 시 `download/제목.mp3` 형식으로 깔끔하게 저장됩니다.
@@ -87,7 +88,7 @@ https://music.youtube.com/playlist?list=OLAK5uy_lSogrSY4JibkASVaZt-QVeJ2TDMFrGRE
 https://music.youtube.com/playlist?list=OLAK5uy_nwZ6zMHtubNwcxA5oWIwfMz7DDtjv7OtY&si=OKOwso8NjTeWskaE
 ```
 
-2. 명령어 실행:
+1. 명령어 실행:
 
 ```bash
 python main.py
