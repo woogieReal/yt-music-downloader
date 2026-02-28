@@ -5,8 +5,9 @@ import os
 import re
 
 class ID3TagPostProcessor(PostProcessor):
-    def __init__(self, downloader=None):
+    def __init__(self, downloader=None, collector: Dict[str, Any] = None):
         super().__init__(downloader)
+        self.collector = collector
 
     def run(self, info):
         filepath = info.get('filepath')
@@ -69,6 +70,16 @@ class ID3TagPostProcessor(PostProcessor):
                 tag_status += f", Track: {track_number}"
             print(f"[bold green]Applied ID3 tags (from metadata): {tag_status}[/bold green]")
             
+            # Collect for xattr (if collector provided)
+            if self.collector is not None:
+                if artist:
+                    self.collector['artists'].append(artist)
+                if year:
+                    try:
+                        self.collector['years'].append(int(year))
+                    except (ValueError, TypeError):
+                        pass
+
         return [], info
 
 def fetch_info(url: str) -> Dict[str, Any]:
@@ -136,11 +147,49 @@ def download_media(url: str, info_dict: Dict[str, Any]) -> None:
     progress_manager = DownloadProgressManager(info_dict)
     ydl_opts['progress_hooks'] = [progress_manager.yt_dlp_hook]
     
+    # Collector for playlist-level metadata (xattr)
+    collector = {'artists': [], 'years': []}
+    
     try:
         with progress_manager:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.add_post_processor(ID3TagPostProcessor(downloader=ydl), when='post_process')
+                ydl.add_post_processor(ID3TagPostProcessor(downloader=ydl, collector=collector), when='post_process')
                 ydl.download([url])
+                
+        # After download, if it was a playlist, apply xattr to the directory
+        if 'entries' in info_dict:
+            # Determine destination directory
+            playlist_title = info_dict.get('title', 'Unknown')
+            if isinstance(playlist_title, str) and playlist_title.startswith('Album - '):
+                playlist_title = playlist_title[len('Album - '):]
+            
+            root_dir = os.path.join('download', playlist_title)
+            
+            if os.path.isdir(root_dir):
+                import subprocess
+                final_artist = None
+                if collector['artists']:
+                    # Use the most frequent artist as representative
+                    from collections import Counter
+                    final_artist = Counter(collector['artists']).most_common(1)[0][0]
+                
+                final_year = None
+                if collector['years']:
+                    final_year = str(min(collector['years']))
+                
+                try:
+                    if final_artist:
+                        subprocess.run(['xattr', '-w', 'user.artist', final_artist, root_dir], stderr=subprocess.DEVNULL, check=True)
+                    if final_year:
+                        subprocess.run(['xattr', '-w', 'user.year', final_year, root_dir], stderr=subprocess.DEVNULL, check=True)
+                    
+                    if final_artist or final_year:
+                        from rich import print
+                        print(f"[bold cyan]  -> 디렉터리 메타데이터 업데이트: Artist='{final_artist}', Year='{final_year}'[/bold cyan]")
+                except Exception:
+                    # xattr is not available or not supported on this filesystem
+                    pass
+
     except Exception as e:
         from rich import print
         print(f"\n[bold red]Fatal Download Error: {e}[/bold red]")

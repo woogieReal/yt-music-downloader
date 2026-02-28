@@ -76,6 +76,19 @@ def main():
             file_path = os.path.join(target_path, filename)
             update_id3_tags(file_path, **update_params)
         
+        # After updating files, also update the directory's metadata (xattr)
+        import subprocess
+        try:
+            if args.artist:
+                subprocess.run(['xattr', '-w', 'user.artist', args.artist, target_path], stderr=subprocess.DEVNULL, check=True)
+            if args.year:
+                subprocess.run(['xattr', '-w', 'user.year', str(args.year), target_path], stderr=subprocess.DEVNULL, check=True)
+            if args.artist or args.year:
+                print(f"[bold cyan]  -> 디렉터리 메타데이터 업데이트: Artist='{args.artist}', Year='{args.year}'[/bold cyan]")
+        except Exception:
+            # xattr is not available or not supported
+            pass
+        
         print(f"\n[bold green]Finished processing {len(mp3_files)} files.[/bold green]")
 
 if __name__ == "__main__":
