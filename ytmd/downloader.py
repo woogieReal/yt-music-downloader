@@ -21,11 +21,17 @@ def get_base_ydl_opts() -> Dict[str, Any]:
     """
     return {
         'format': 'bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
+        'writethumbnail': True,
+        'postprocessors': [
+            {
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            },
+            {
+                'key': 'EmbedThumbnail',
+            }
+        ],
         # Template will be set in download_media depending on if it is a playlist or not
         # 'restrictfilenames': True,  # Removes spaces and non-ASCII characters
         'quiet': True,
