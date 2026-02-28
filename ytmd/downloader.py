@@ -52,7 +52,13 @@ def download_media(url: str, info_dict: Dict[str, Any]) -> None:
     # Set outtmpl dynamically
     if 'entries' in info_dict:
         # Create a folder named after the playlist
-        ydl_opts['outtmpl'] = 'download/%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s'
+        # Strip "Album - " prefix if present (common in YouTube Music albums)
+        playlist_title = info_dict.get('title', '%(playlist_title)s')
+        if isinstance(playlist_title, str) and playlist_title.startswith('Album - '):
+            clean_title = playlist_title[len('Album - '):]
+            ydl_opts['outtmpl'] = f'download/{clean_title}/%(playlist_index)s - %(title)s.%(ext)s'
+        else:
+            ydl_opts['outtmpl'] = 'download/%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s'
     else:
         ydl_opts['outtmpl'] = 'download/%(title)s.%(ext)s'
     
