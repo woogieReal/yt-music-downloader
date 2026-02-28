@@ -94,4 +94,21 @@ https://music.youtube.com/playlist?list=OLAK5uy_nwZ6zMHtubNwcxA5oWIwfMz7DDtjv7Ot
 python main.py
 ```
 
+### (New) ID3 태그 수동 수정
+
+이미 다운로드된 MP3 파일 또는 디렉터리 내의 모든 MP3 파일에 대해 ID3 태그를 수동으로 입력하거나 수정하고 싶을 때 `edit_tags.py`를 사용합니다.
+
+```bash
+# 단일 파일 수정
+python edit_tags.py "path/to/music.mp3" --artist="가수명" --album="앨범명" --year="2024"
+
+# 디렉터리 내 모든 MP3 파일 일괄 수정
+python edit_tags.py "path/to/album_directory" --artist="가수명" --album="앨범명" --year="2024"
+```
+
+- 인자로 전달한 태그(`--artist`, `--album`, `--year`)만 업데이트되며, 지정하지 않은 태그는 기존 값을 유지합니다.
+- 디렉터리 경로를 입력하면 하위의 모든 `.mp3` 파일을 자동으로 찾아 업데이트합니다.
+
+---
+
 *참고: 특수문자(`&` 등)로 인한 쉘 파싱 오류를 방지하기 위해 CLI에서 URL을 직접 입력할 때는 반드시 큰따옴표(`""`)로 감싸서 실행하는 것을 권장합니다.*
