@@ -76,4 +76,21 @@ python main.py "https://www.youtube.com/watch?v=YOUR_VIDEO_ID"
 python main.py "https://www.youtube.com/playlist?list=YOUR_PLAYLIST_ID"
 ```
 
-*참고: 특수문자(`&` 등)로 인한 쉘 파싱 오류를 방지하기 위해 URL을 반드시 큰따옴표(`""`)로 감싸서 실행하는 것을 권장합니다.*
+### (New) 여러 개의 URL 일괄 다운로드
+
+프로젝트 폴더 내에 `items.txt` 파일을 생성하고, 다운로드할 URL들을 한 줄씩 입력한 후, 매개변수 없이 `main.py`를 실행하세요.
+
+1. `items.txt` 내용 예시:
+
+```txt
+https://music.youtube.com/playlist?list=OLAK5uy_lSogrSY4JibkASVaZt-QVeJ2TDMFrGREc&si=zcNOeoPV2le_d8bv
+https://music.youtube.com/playlist?list=OLAK5uy_nwZ6zMHtubNwcxA5oWIwfMz7DDtjv7OtY&si=OKOwso8NjTeWskaE
+```
+
+2. 명령어 실행:
+
+```bash
+python main.py
+```
+
+*참고: 특수문자(`&` 등)로 인한 쉘 파싱 오류를 방지하기 위해 CLI에서 URL을 직접 입력할 때는 반드시 큰따옴표(`""`)로 감싸서 실행하는 것을 권장합니다.*
