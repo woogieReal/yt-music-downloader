@@ -52,9 +52,9 @@ def download_media(url: str, info_dict: Dict[str, Any]) -> None:
     # Set outtmpl dynamically
     if 'entries' in info_dict:
         # Create a folder named after the playlist
-        ydl_opts['outtmpl'] = '%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s'
+        ydl_opts['outtmpl'] = 'download/%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s'
     else:
-        ydl_opts['outtmpl'] = '%(title)s.%(ext)s'
+        ydl_opts['outtmpl'] = 'download/%(title)s.%(ext)s'
     
     # We will pass progress hooks
     progress_manager = DownloadProgressManager(info_dict)

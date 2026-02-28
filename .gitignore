@@ -43,3 +43,6 @@ ENV/
 # album art
 *.webp
 *.jpg
+
+# download folder
+download/
