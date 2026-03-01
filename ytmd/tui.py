@@ -107,7 +107,7 @@ class YouTubeDownloaderApp(App):
             with Vertical(id="input_dialog"):
                 yield Label("Enter YouTube Video or Playlist URL, and press Enter:")
                 yield Input(placeholder="https://youtube.com/...", id="url_input")
-                yield Checkbox("Use Playlist Cover as Album Art for all tracks?", value=True, id="use_playlist_thumb")
+                yield Checkbox("Use Playlist Cover as Album Art for all tracks?", value=False, id="use_playlist_thumb")
                 yield Checkbox("Set metadata manually?", value=False, id="manual_metadata_checkbox")
                 with Vertical(id="manual_metadata_inputs"):
                     yield Input(placeholder="Artist", id="meta_artist", classes="meta-input")
