@@ -5,17 +5,18 @@ import os
 import re
 
 class ID3TagPostProcessor(PostProcessor):
-    def __init__(self, downloader=None, collector: Dict[str, Any] = None, print_func=None, update_tags_func=None):
+    def __init__(self, downloader=None, collector: Dict[str, Any] = None, print_func=None, update_tags_func=None, use_playlist_thumb=False):
         super().__init__(downloader)
         self.collector = collector
         self.print_func = print_func or __import__('rich').print
         self.update_tags_func = update_tags_func
+        self.use_playlist_thumb = use_playlist_thumb
 
     def run(self, info):
         filepath = info.get('filepath')
         if filepath and filepath.endswith('.mp3'):
             from mutagen.easyid3 import EasyID3
-            from mutagen.id3 import ID3NoHeaderError
+            from mutagen.id3 import ID3, APIC, ID3NoHeaderError
             
             # 1. Metadata Extraction (Title, Artist, Album, Year, Track)
             title = info.get('title')
@@ -60,6 +61,32 @@ class ID3TagPostProcessor(PostProcessor):
                 
             audio.save()
             
+            # 2. Album Art Logic (Playlist Cover Override)
+            if self.use_playlist_thumb:
+                parent_dir = os.path.dirname(filepath)
+                playlist_thumb = None
+                # Look for "0 - ..." image files in the same directory
+                for f in os.listdir(parent_dir):
+                    if f.startswith('0 - ') and f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
+                        playlist_thumb = os.path.join(parent_dir, f)
+                        break
+                
+                if playlist_thumb:
+                    try:
+                        audio_id3 = ID3(filepath)
+                        with open(playlist_thumb, 'rb') as img_file:
+                            mime = 'image/jpeg' if playlist_thumb.lower().endswith(('.jpg', '.jpeg')) else 'image/png'
+                            audio_id3.add(APIC(
+                                encoding=3,
+                                mime=mime,
+                                type=3,
+                                desc=u'Cover',
+                                data=img_file.read()
+                            ))
+                        audio_id3.save()
+                    except Exception as e:
+                        self.print_func(f"[dim red]Failed to apply playlist cover to {filepath}: {e}[/dim red]")
+
             # Applied tags summary for TUI
             tags_dict = {
                 "title": title,
@@ -124,7 +151,7 @@ def get_base_ydl_opts() -> Dict[str, Any]:
         'updatetime': False,
     }
 
-def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, print_func=None, update_tags_func=None) -> None:
+def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, print_func=None, update_tags_func=None, use_playlist_thumb=False) -> None:
     """
     Download the media using the fetched info dictionary.
     """
@@ -160,10 +187,10 @@ def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, p
     try:
         with progress_manager:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.add_post_processor(ID3TagPostProcessor(downloader=ydl, collector=collector, print_func=print_func, update_tags_func=update_tags_func), when='post_process')
+                ydl.add_post_processor(ID3TagPostProcessor(downloader=ydl, collector=collector, print_func=print_func, update_tags_func=update_tags_func, use_playlist_thumb=use_playlist_thumb), when='post_process')
                 ydl.download([url])
                 
-        # After download, if it was a playlist, apply xattr to the directory
+        # After download, if it was a playlist, cleanup or update xattr
         if 'entries' in info_dict:
             # Determine destination directory
             playlist_title = info_dict.get('title', 'Unknown')

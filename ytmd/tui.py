@@ -1,5 +1,5 @@
 from textual.app import App, ComposeResult
-from textual.widgets import Input, Label, Header, Footer, DataTable, ProgressBar, RichLog, Button
+from textual.widgets import Input, Label, Header, Footer, DataTable, ProgressBar, RichLog, Button, Checkbox
 from textual.containers import Vertical
 from textual import work
 from typing import Dict, Any
@@ -49,12 +49,16 @@ class YouTubeDownloaderApp(App):
     #input_dialog {
         padding: 1 2;
         width: 60;
-        height: 11;
+        height: auto;
+        min-height: 13;
         border: thick $background 80%;
         background: $surface;
     }
     #url_input {
-        margin-top: 2;
+        margin-top: 1;
+    }
+    #use_playlist_thumb {
+        margin-top: 1;
     }
     #download_view {
         display: none;
@@ -88,6 +92,7 @@ class YouTubeDownloaderApp(App):
             with Vertical(id="input_dialog"):
                 yield Label("Enter YouTube Video or Playlist URL, and press Enter:")
                 yield Input(placeholder="https://youtube.com/...", id="url_input")
+                yield Checkbox("Use Playlist Cover as Album Art for all tracks?", value=True, id="use_playlist_thumb")
         
         # Download Screen
         with Vertical(id="download_view"):
@@ -107,10 +112,11 @@ class YouTubeDownloaderApp(App):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         url = event.value.strip()
+        use_playlist_thumb = self.query_one("#use_playlist_thumb", Checkbox).value
         if url:
             self.query_one("#input_view").styles.display = "none"
             self.query_one("#download_view").styles.display = "block"
-            self.run_download(url)
+            self.run_download(url, use_playlist_thumb)
             
     def tui_print(self, text: str):
         """Redirect print statements to the RichLog."""
@@ -118,7 +124,7 @@ class YouTubeDownloaderApp(App):
         log_view.write(text)
 
     @work(thread=True)
-    def run_download(self, url: str) -> None:
+    def run_download(self, url: str, use_playlist_thumb: bool = True) -> None:
         from ytmd.downloader import fetch_info, download_media
         
         self.call_from_thread(self.tui_print, f"Started fetching info for: {url}")
@@ -132,7 +138,7 @@ class YouTubeDownloaderApp(App):
             def update_tags(idx: str, tags: dict):
                 self.call_from_thread(self.update_row_status, idx, tags)
                 
-            download_media(url, info, progress_manager=pm, print_func=self.tui_print, update_tags_func=update_tags)
+            download_media(url, info, progress_manager=pm, print_func=self.tui_print, update_tags_func=update_tags, use_playlist_thumb=use_playlist_thumb)
             
             self.call_from_thread(self.tui_print, "[bold green]Download Process Completed![/bold green]")
             self.call_from_thread(self.show_finish_button)
@@ -238,7 +244,7 @@ def run_tui_app(url: str = None):
         def trigger_download_on_mount():
             app.query_one("#input_view").styles.display = "none"
             app.query_one("#download_view").styles.display = "block"
-            app.run_download(url)
+            app.run_download(url, use_playlist_thumb=True) # Default from CLI
         # Schedule the action on mount
         app.call_after_refresh(trigger_download_on_mount)
     app.run()
