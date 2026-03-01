@@ -1,5 +1,5 @@
 from textual.app import App, ComposeResult
-from textual.widgets import Input, Label, Header, Footer, DataTable, ProgressBar, RichLog
+from textual.widgets import Input, Label, Header, Footer, DataTable, ProgressBar, RichLog, Button
 from textual.containers import Vertical
 from textual import work
 from typing import Dict, Any
@@ -75,6 +75,10 @@ class YouTubeDownloaderApp(App):
         border: solid $secondary;
         margin-top: 1;
     }
+    #back_button {
+        margin-top: 1;
+        width: 100%;
+    }
     """
 
     def compose(self) -> ComposeResult:
@@ -97,6 +101,7 @@ class YouTubeDownloaderApp(App):
             yield ProgressBar(id="current_file_progress")
             
             yield RichLog(id="log_view", markup=True)
+            yield Button("Return to Home (Download More)", id="back_button", variant="primary", classes="hidden")
             
         yield Footer()
 
@@ -130,8 +135,35 @@ class YouTubeDownloaderApp(App):
             download_media(url, info, progress_manager=pm, print_func=self.tui_print, update_tags_func=update_tags)
             
             self.call_from_thread(self.tui_print, "[bold green]Download Process Completed![/bold green]")
+            self.call_from_thread(self.show_finish_button)
         except Exception as e:
             self.call_from_thread(self.tui_print, f"[bold red]Error[/bold red]: {e}")
+            self.call_from_thread(self.show_finish_button)
+
+    def show_finish_button(self):
+        self.query_one("#back_button", Button).remove_class("hidden")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "back_button":
+            # 1. Reset widgets
+            self.query_one("#url_input", Input).value = ""
+            self.query_one("#status_label", Label).update("[bold cyan]Fetching metadata...[/bold cyan]")
+            
+            table = self.query_one("#summary_table", DataTable)
+            table.clear(columns=True)
+            
+            self.query_one("#overall_progress_label", Label).add_class("hidden")
+            self.query_one("#overall_progress", ProgressBar).add_class("hidden")
+            self.query_one("#current_file_label", Label).update("Current File")
+            self.query_one("#current_file_progress", ProgressBar).update(total=100, progress=0)
+            
+            self.query_one("#log_view", RichLog).clear()
+            self.query_one("#back_button", Button).add_class("hidden")
+            
+            # 2. Switch views
+            self.query_one("#download_view").styles.display = "none"
+            self.query_one("#input_view").styles.display = "block"
+            self.query_one("#url_input").focus()
 
     def update_summary_table(self, info_dict: Dict[str, Any]) -> None:
         self.query_one("#status_label", Label).update("[bold green]Metadata fetched. Downloading...[/bold green]")
