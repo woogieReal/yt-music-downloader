@@ -5,10 +5,11 @@ import os
 import re
 
 class ID3TagPostProcessor(PostProcessor):
-    def __init__(self, downloader=None, collector: Dict[str, Any] = None, print_func=None):
+    def __init__(self, downloader=None, collector: Dict[str, Any] = None, print_func=None, update_tags_func=None):
         super().__init__(downloader)
         self.collector = collector
         self.print_func = print_func or __import__('rich').print
+        self.update_tags_func = update_tags_func
 
     def run(self, info):
         filepath = info.get('filepath')
@@ -59,17 +60,18 @@ class ID3TagPostProcessor(PostProcessor):
                 
             audio.save()
             
-            tag_status = f"Title: {title}"
-            if artist:
-                tag_status += f", Artist: {artist}"
-            if album:
-                tag_status += f", Album: {album}"
-            if year:
-                tag_status += f", Year: {year}"
-            if track_number:
-                tag_status += f", Track: {track_number}"
-                
-            self.print_func(f"[bold green]Applied ID3 tags (from metadata): {tag_status}[/bold green]")
+            # Applied tags summary for TUI
+            tags_dict = {
+                "title": title,
+                "artist": artist or "",
+                "album": album or "",
+                "year": str(year) if year else "",
+                "track": str(track_number) if track_number else ""
+            }
+            
+            if self.update_tags_func:
+                idx = str(track_number) if track_number else "1"
+                self.update_tags_func(idx, tags_dict)
             
             # Collect for xattr (if collector provided)
             if self.collector is not None:
@@ -122,7 +124,7 @@ def get_base_ydl_opts() -> Dict[str, Any]:
         'updatetime': False,
     }
 
-def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, print_func=None) -> None:
+def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, print_func=None, update_tags_func=None) -> None:
     """
     Download the media using the fetched info dictionary.
     """
@@ -158,7 +160,7 @@ def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, p
     try:
         with progress_manager:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.add_post_processor(ID3TagPostProcessor(downloader=ydl, collector=collector, print_func=print_func), when='post_process')
+                ydl.add_post_processor(ID3TagPostProcessor(downloader=ydl, collector=collector, print_func=print_func, update_tags_func=update_tags_func), when='post_process')
                 ydl.download([url])
                 
         # After download, if it was a playlist, apply xattr to the directory

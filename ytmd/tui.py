@@ -123,7 +123,11 @@ class YouTubeDownloaderApp(App):
             self.call_from_thread(self.update_summary_table, info)
             
             pm = TUIProgressHooks(self, info)
-            download_media(url, info, progress_manager=pm, print_func=self.tui_print)
+            
+            def update_tags(idx: str, tags: dict):
+                self.call_from_thread(self.update_row_status, idx, tags)
+                
+            download_media(url, info, progress_manager=pm, print_func=self.tui_print, update_tags_func=update_tags)
             
             self.call_from_thread(self.tui_print, "[bold green]Download Process Completed![/bold green]")
         except Exception as e:
@@ -132,7 +136,14 @@ class YouTubeDownloaderApp(App):
     def update_summary_table(self, info_dict: Dict[str, Any]) -> None:
         self.query_one("#status_label", Label).update("[bold green]Metadata fetched. Downloading...[/bold green]")
         table = self.query_one("#summary_table", DataTable)
-        table.add_columns("Index", "Title", "Duration (s)")
+        table.add_column("Index", key="index")
+        table.add_column("YT Title", key="yt_title")
+        table.add_column("Duration", key="duration")
+        table.add_column("ID3 Title", key="title")
+        table.add_column("Artist", key="artist")
+        table.add_column("Album", key="album")
+        table.add_column("Year", key="year")
+        table.add_column("Track", key="track")
         
         if 'entries' in info_dict:
             self.tui_print(f"[bold yellow]Playlist Detected:[/bold yellow] {info_dict.get('title', 'Unknown')}")
@@ -141,12 +152,20 @@ class YouTubeDownloaderApp(App):
                 if not entry: continue
                 title = entry.get('title', 'Unknown')
                 duration = str(entry.get('duration', 'N/A'))
-                table.add_row(str(i), title, duration)
+                table.add_row(str(i), title, duration, "-", "-", "-", "-", "-", key=str(i))
         else:
             self.tui_print("[bold yellow]Single Video Detected[/bold yellow]")
             title = info_dict.get('title', 'Unknown')
             duration = str(info_dict.get('duration', 'N/A'))
-            table.add_row("1", title, duration)
+            table.add_row("1", title, duration, "-", "-", "-", "-", "-", key="1")
+
+    def update_row_status(self, idx: str, tags: dict) -> None:
+        try:
+            table = self.query_one("#summary_table", DataTable)
+            for key, value in tags.items():
+                table.update_cell(row_key=idx, column_key=key, value=value, update_width=True)
+        except Exception as e:
+            self.tui_print(f"[red]Error updating table cells for row {idx}: {e}[/red]")
 
     def setup_progress(self, is_playlist: bool, total_items: int) -> None:
         if is_playlist and total_items > 1:
