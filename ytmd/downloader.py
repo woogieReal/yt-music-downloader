@@ -5,13 +5,14 @@ import os
 import re
 
 class ID3TagPostProcessor(PostProcessor):
-    def __init__(self, downloader=None, collector: Dict[str, Any] = None, print_func=None, update_tags_func=None, use_playlist_thumb=False, manual_meta: Dict[str, str] = None):
+    def __init__(self, downloader=None, collector: Dict[str, Any] = None, print_func=None, update_tags_func=None, use_playlist_thumb=False, manual_meta: Dict[str, str] = None, custom_image_path: str = None):
         super().__init__(downloader)
         self.collector = collector
         self.print_func = print_func or __import__('rich').print
         self.update_tags_func = update_tags_func
         self.use_playlist_thumb = use_playlist_thumb
         self.manual_meta = manual_meta or {}
+        self.custom_image_path = custom_image_path
 
     def run(self, info):
         filepath = info.get('filepath')
@@ -66,7 +67,26 @@ class ID3TagPostProcessor(PostProcessor):
             audio.save()
             
             # 2. Album Art Logic (Playlist Cover Override)
-            if self.use_playlist_thumb:
+            custom_thumb_applied = False
+            if self.custom_image_path and os.path.exists(self.custom_image_path) and os.path.isfile(self.custom_image_path):
+                try:
+                    audio_id3 = ID3(filepath)
+                    audio_id3.delall('APIC') # Remove existing track thumbnail
+                    with open(self.custom_image_path, 'rb') as img_file:
+                        mime = 'image/jpeg' if self.custom_image_path.lower().endswith(('.jpg', '.jpeg')) else 'image/png'
+                        audio_id3.add(APIC(
+                            encoding=3,
+                            mime=mime,
+                            type=3,
+                            desc=u'Cover',
+                            data=img_file.read()
+                        ))
+                    audio_id3.save(v2_version=3)
+                    custom_thumb_applied = True
+                except Exception as e:
+                    self.print_func(f"[dim red]Failed to apply custom cover to {filepath}: {e}[/dim red]")
+
+            if self.use_playlist_thumb and not custom_thumb_applied:
                 parent_dir = os.path.dirname(filepath)
                 playlist_thumb = None
                 # Look for "0 - ..." image files in the same directory
@@ -156,7 +176,7 @@ def get_base_ydl_opts() -> Dict[str, Any]:
         'updatetime': False,
     }
 
-def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, print_func=None, update_tags_func=None, use_playlist_thumb=False, manual_meta: Dict[str, str] = None) -> None:
+def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, print_func=None, update_tags_func=None, use_playlist_thumb=False, manual_meta: Dict[str, str] = None, custom_image_path: str = None) -> None:
     """
     Download the media using the fetched info dictionary.
     """
@@ -189,10 +209,41 @@ def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, p
     # Collector for playlist-level metadata (xattr)
     collector = {'artists': [], 'years': []}
     
+    local_custom_image_path = None
+    is_temp_image = False
+    if custom_image_path:
+        custom_image_path = custom_image_path.strip().strip("'").strip('"')
+        if custom_image_path.startswith('file://'):
+            custom_image_path = custom_image_path[7:]
+            
+        if custom_image_path.startswith('http://') or custom_image_path.startswith('https://'):
+            import urllib.request
+            import tempfile
+            try:
+                ext = '.jpg'
+                if '.png' in custom_image_path.lower(): ext = '.png'
+                elif '.webp' in custom_image_path.lower(): ext = '.webp'
+                
+                fd, temp_path = tempfile.mkstemp(suffix=ext)
+                os.close(fd)
+                
+                req = urllib.request.Request(custom_image_path, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req) as response, open(temp_path, 'wb') as out_file:
+                    out_file.write(response.read())
+                    
+                local_custom_image_path = temp_path
+                is_temp_image = True
+            except Exception as e:
+                if print_func: print_func(f"[red]Failed to download custom image: {e}[/red]")
+        else:
+            local_custom_image_path = custom_image_path.replace('\\ ', ' ')
+            if not os.path.exists(local_custom_image_path) and os.path.exists(custom_image_path):
+                local_custom_image_path = custom_image_path
+
     try:
         with progress_manager:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.add_post_processor(ID3TagPostProcessor(downloader=ydl, collector=collector, print_func=print_func, update_tags_func=update_tags_func, use_playlist_thumb=use_playlist_thumb, manual_meta=manual_meta), when='post_process')
+                ydl.add_post_processor(ID3TagPostProcessor(downloader=ydl, collector=collector, print_func=print_func, update_tags_func=update_tags_func, use_playlist_thumb=use_playlist_thumb, manual_meta=manual_meta, custom_image_path=local_custom_image_path), when='post_process')
                 ydl.download([url])
                 
         # After download, if it was a playlist, cleanup or update xattr
@@ -206,6 +257,28 @@ def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, p
             
             if os.path.isdir(root_dir):
                 import subprocess
+                import shutil
+                import glob
+                
+                if local_custom_image_path and os.path.exists(local_custom_image_path):
+                    for ext in ('*.jpg', '*.jpeg', '*.png', '*.webp'):
+                        for file in glob.glob(os.path.join(glob.escape(root_dir), f'0 - {ext}')):
+                            try:
+                                os.remove(file)
+                            except Exception:
+                                pass
+                    _, custom_ext = os.path.splitext(local_custom_image_path)
+                    if not custom_ext:
+                        custom_ext = '.jpg'
+                    dest_path = os.path.join(root_dir, f'0 - cover{custom_ext}')
+                    try:
+                        shutil.copy2(local_custom_image_path, dest_path)
+                        if print_func:
+                            print_func(f"[bold cyan]  -> 플레이리스트 커버 이미지를 커스텀 이미지로 교체했습니다.[/bold cyan]")
+                    except Exception as e:
+                        if print_func:
+                            print_func(f"[red]Failed to copy custom cover image: {e}[/red]")
+                
                 
                 final_artist = None
                 if manual_meta and manual_meta.get('artist'):
@@ -235,3 +308,10 @@ def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, p
 
     except Exception as e:
         print_func(f"\n[bold red]Fatal Download Error: {e}[/bold red]")
+    finally:
+        if is_temp_image and local_custom_image_path:
+            try:
+                if os.path.exists(local_custom_image_path):
+                    os.remove(local_custom_image_path)
+            except:
+                pass
