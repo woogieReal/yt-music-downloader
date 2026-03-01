@@ -2,7 +2,7 @@ import argparse
 import sys
 from ytmd.downloader import fetch_info, download_media
 from ytmd.ui import display_summary_table
-from ytmd.tui import get_url_from_ui
+from ytmd.tui import run_tui_app
 from rich import print
 
 def process_url(url: str):
@@ -38,14 +38,11 @@ def main():
     
     url = args.url
     if not url:
-        # Load the TUI to get the URL
-        url = get_url_from_ui()
-        
-    if not url:
-        print("[yellow]No URL provided. Exiting.[/yellow]")
-        sys.exit(0)
-        
-    process_url(url)
+        # Enable full TUI Downloader automatically
+        run_tui_app()
+    else:
+        # Run pure CLI mode for automation
+        process_url(url)
 
 if __name__ == "__main__":
     main()

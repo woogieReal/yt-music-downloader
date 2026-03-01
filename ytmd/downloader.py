@@ -5,9 +5,10 @@ import os
 import re
 
 class ID3TagPostProcessor(PostProcessor):
-    def __init__(self, downloader=None, collector: Dict[str, Any] = None):
+    def __init__(self, downloader=None, collector: Dict[str, Any] = None, print_func=None):
         super().__init__(downloader)
         self.collector = collector
+        self.print_func = print_func or __import__('rich').print
 
     def run(self, info):
         filepath = info.get('filepath')
@@ -42,8 +43,7 @@ class ID3TagPostProcessor(PostProcessor):
                 audio.add_tags()
                 audio = EasyID3(filepath)
             except Exception as e:
-                from rich import print
-                print(f"[bold red]Failed to read ID3 tags from {filepath}: {e}[/bold red]")
+                self.print_func(f"[bold red]Failed to read ID3 tags from {filepath}: {e}[/bold red]")
                 return [], info
             
             # Apply Tags
@@ -58,7 +58,7 @@ class ID3TagPostProcessor(PostProcessor):
                 audio['tracknumber'] = str(track_number)
                 
             audio.save()
-            from rich import print
+            
             tag_status = f"Title: {title}"
             if artist:
                 tag_status += f", Artist: {artist}"
@@ -68,7 +68,8 @@ class ID3TagPostProcessor(PostProcessor):
                 tag_status += f", Year: {year}"
             if track_number:
                 tag_status += f", Track: {track_number}"
-            print(f"[bold green]Applied ID3 tags (from metadata): {tag_status}[/bold green]")
+                
+            self.print_func(f"[bold green]Applied ID3 tags (from metadata): {tag_status}[/bold green]")
             
             # Collect for xattr (if collector provided)
             if self.collector is not None:
@@ -121,12 +122,17 @@ def get_base_ydl_opts() -> Dict[str, Any]:
         'updatetime': False,
     }
 
-def download_media(url: str, info_dict: Dict[str, Any]) -> None:
+def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, print_func=None) -> None:
     """
     Download the media using the fetched info dictionary.
     """
-    # UI Manager instantiation will happen here, or be passed in
-    from ytmd.ui import DownloadProgressManager
+    if print_func is None:
+        from rich import print as rich_print
+        print_func = rich_print
+        
+    if progress_manager is None:
+        from ytmd.ui import DownloadProgressManager
+        progress_manager = DownloadProgressManager(info_dict)
     
     ydl_opts = get_base_ydl_opts()
     
@@ -144,7 +150,6 @@ def download_media(url: str, info_dict: Dict[str, Any]) -> None:
         ydl_opts['outtmpl'] = 'download/%(title)s.%(ext)s'
     
     # We will pass progress hooks
-    progress_manager = DownloadProgressManager(info_dict)
     ydl_opts['progress_hooks'] = [progress_manager.yt_dlp_hook]
     
     # Collector for playlist-level metadata (xattr)
@@ -153,7 +158,7 @@ def download_media(url: str, info_dict: Dict[str, Any]) -> None:
     try:
         with progress_manager:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.add_post_processor(ID3TagPostProcessor(downloader=ydl, collector=collector), when='post_process')
+                ydl.add_post_processor(ID3TagPostProcessor(downloader=ydl, collector=collector, print_func=print_func), when='post_process')
                 ydl.download([url])
                 
         # After download, if it was a playlist, apply xattr to the directory
@@ -184,12 +189,10 @@ def download_media(url: str, info_dict: Dict[str, Any]) -> None:
                         subprocess.run(['xattr', '-w', 'user.year', final_year, root_dir], stderr=subprocess.DEVNULL, check=True)
                     
                     if final_artist or final_year:
-                        from rich import print
-                        print(f"[bold cyan]  -> 디렉터리 메타데이터 업데이트: Artist='{final_artist}', Year='{final_year}'[/bold cyan]")
+                        print_func(f"[bold cyan]  -> 디렉터리 메타데이터 업데이트: Artist='{final_artist}', Year='{final_year}'[/bold cyan]")
                 except Exception:
                     # xattr is not available or not supported on this filesystem
                     pass
 
     except Exception as e:
-        from rich import print
-        print(f"\n[bold red]Fatal Download Error: {e}[/bold red]")
+        print_func(f"\n[bold red]Fatal Download Error: {e}[/bold red]")
