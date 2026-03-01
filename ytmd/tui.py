@@ -60,6 +60,21 @@ class YouTubeDownloaderApp(App):
     #use_playlist_thumb {
         margin-top: 1;
     }
+    #manual_metadata_checkbox {
+        margin-top: 1;
+    }
+    #manual_metadata_inputs {
+        display: none;
+        margin-top: 1;
+        padding-left: 1;
+        height: auto;
+    }
+    #manual_metadata_inputs.-active {
+        display: block;
+    }
+    .meta-input {
+        margin-top: 1;
+    }
     #download_view {
         display: none;
         padding: 1 2;
@@ -93,6 +108,11 @@ class YouTubeDownloaderApp(App):
                 yield Label("Enter YouTube Video or Playlist URL, and press Enter:")
                 yield Input(placeholder="https://youtube.com/...", id="url_input")
                 yield Checkbox("Use Playlist Cover as Album Art for all tracks?", value=True, id="use_playlist_thumb")
+                yield Checkbox("Set metadata manually?", value=False, id="manual_metadata_checkbox")
+                with Vertical(id="manual_metadata_inputs"):
+                    yield Input(placeholder="Artist", id="meta_artist", classes="meta-input")
+                    yield Input(placeholder="Album", id="meta_album", classes="meta-input")
+                    yield Input(placeholder="Year", id="meta_year", classes="meta-input")
         
         # Download Screen
         with Vertical(id="download_view"):
@@ -110,13 +130,34 @@ class YouTubeDownloaderApp(App):
             
         yield Footer()
 
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        if event.checkbox.id == "manual_metadata_checkbox":
+            inputs_view = self.query_one("#manual_metadata_inputs")
+            if event.checkbox.value:
+                inputs_view.add_class("-active")
+                self.query_one("#input_dialog").styles.min_height = 25 # Expand dialog height
+            else:
+                inputs_view.remove_class("-active")
+                self.query_one("#input_dialog").styles.min_height = 13 # Restore dialog height
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        url = event.value.strip()
+        url = self.query_one("#url_input", Input).value.strip()
+        if not url:
+            return
+            
         use_playlist_thumb = self.query_one("#use_playlist_thumb", Checkbox).value
-        if url:
-            self.query_one("#input_view").styles.display = "none"
-            self.query_one("#download_view").styles.display = "block"
-            self.run_download(url, use_playlist_thumb)
+        
+        manual_meta = None
+        if self.query_one("#manual_metadata_checkbox", Checkbox).value:
+            manual_meta = {
+                'artist': self.query_one("#meta_artist", Input).value.strip(),
+                'album': self.query_one("#meta_album", Input).value.strip(),
+                'year': self.query_one("#meta_year", Input).value.strip()
+            }
+            
+        self.query_one("#input_view").styles.display = "none"
+        self.query_one("#download_view").styles.display = "block"
+        self.run_download(url, use_playlist_thumb, manual_meta)
             
     def tui_print(self, text: str):
         """Redirect print statements to the RichLog."""
@@ -124,7 +165,7 @@ class YouTubeDownloaderApp(App):
         log_view.write(text)
 
     @work(thread=True)
-    def run_download(self, url: str, use_playlist_thumb: bool = True) -> None:
+    def run_download(self, url: str, use_playlist_thumb: bool = True, manual_meta: Dict[str, str] = None) -> None:
         from ytmd.downloader import fetch_info, download_media
         
         self.call_from_thread(self.tui_print, f"Started fetching info for: {url}")
@@ -138,7 +179,7 @@ class YouTubeDownloaderApp(App):
             def update_tags(idx: str, tags: dict):
                 self.call_from_thread(self.update_row_status, idx, tags)
                 
-            download_media(url, info, progress_manager=pm, print_func=self.tui_print, update_tags_func=update_tags, use_playlist_thumb=use_playlist_thumb)
+            download_media(url, info, progress_manager=pm, print_func=self.tui_print, update_tags_func=update_tags, use_playlist_thumb=use_playlist_thumb, manual_meta=manual_meta)
             
             self.call_from_thread(self.tui_print, "[bold green]Download Process Completed![/bold green]")
             self.call_from_thread(self.show_finish_button)
@@ -153,6 +194,11 @@ class YouTubeDownloaderApp(App):
         if event.button.id == "back_button":
             # 1. Reset widgets
             self.query_one("#url_input", Input).value = ""
+            self.query_one("#manual_metadata_checkbox", Checkbox).value = False
+            self.query_one("#meta_artist", Input).value = ""
+            self.query_one("#meta_album", Input).value = ""
+            self.query_one("#meta_year", Input).value = ""
+            
             self.query_one("#status_label", Label).update("[bold cyan]Fetching metadata...[/bold cyan]")
             
             table = self.query_one("#summary_table", DataTable)

@@ -5,12 +5,13 @@ import os
 import re
 
 class ID3TagPostProcessor(PostProcessor):
-    def __init__(self, downloader=None, collector: Dict[str, Any] = None, print_func=None, update_tags_func=None, use_playlist_thumb=False):
+    def __init__(self, downloader=None, collector: Dict[str, Any] = None, print_func=None, update_tags_func=None, use_playlist_thumb=False, manual_meta: Dict[str, str] = None):
         super().__init__(downloader)
         self.collector = collector
         self.print_func = print_func or __import__('rich').print
         self.update_tags_func = update_tags_func
         self.use_playlist_thumb = use_playlist_thumb
+        self.manual_meta = manual_meta or {}
 
     def run(self, info):
         filepath = info.get('filepath')
@@ -20,12 +21,15 @@ class ID3TagPostProcessor(PostProcessor):
             
             # 1. Metadata Extraction (Title, Artist, Album, Year, Track)
             title = info.get('title')
-            artist = info.get('artist')
-            album = info.get('album') or info.get('playlist_title')
+            
+            # Manual metadata overrides info dict if provided
+            artist = self.manual_meta.get('artist') or info.get('artist')
+            album = self.manual_meta.get('album') or info.get('album') or info.get('playlist_title')
+            
             track_number = info.get('playlist_index') or info.get('track_number')
             
-            # Year logic: release_year first, then fallback to upload_date (YYYYMMDD)
-            year = info.get('release_year')
+            # Year logic: manual first, then release_year, then fallback to upload_date (YYYYMMDD)
+            year = self.manual_meta.get('year') or info.get('release_year')
             if not year and info.get('upload_date'):
                 upload_date = str(info.get('upload_date'))
                 if len(upload_date) >= 4:
@@ -151,7 +155,7 @@ def get_base_ydl_opts() -> Dict[str, Any]:
         'updatetime': False,
     }
 
-def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, print_func=None, update_tags_func=None, use_playlist_thumb=False) -> None:
+def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, print_func=None, update_tags_func=None, use_playlist_thumb=False, manual_meta: Dict[str, str] = None) -> None:
     """
     Download the media using the fetched info dictionary.
     """
@@ -187,7 +191,7 @@ def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, p
     try:
         with progress_manager:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.add_post_processor(ID3TagPostProcessor(downloader=ydl, collector=collector, print_func=print_func, update_tags_func=update_tags_func, use_playlist_thumb=use_playlist_thumb), when='post_process')
+                ydl.add_post_processor(ID3TagPostProcessor(downloader=ydl, collector=collector, print_func=print_func, update_tags_func=update_tags_func, use_playlist_thumb=use_playlist_thumb, manual_meta=manual_meta), when='post_process')
                 ydl.download([url])
                 
         # After download, if it was a playlist, cleanup or update xattr
@@ -201,14 +205,19 @@ def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, p
             
             if os.path.isdir(root_dir):
                 import subprocess
+                
                 final_artist = None
-                if collector['artists']:
+                if manual_meta and manual_meta.get('artist'):
+                    final_artist = manual_meta['artist']
+                elif collector['artists']:
                     # Use the most frequent artist as representative
                     from collections import Counter
                     final_artist = Counter(collector['artists']).most_common(1)[0][0]
                 
                 final_year = None
-                if collector['years']:
+                if manual_meta and manual_meta.get('year'):
+                    final_year = manual_meta['year']
+                elif collector['years']:
                     final_year = str(min(collector['years']))
                 
                 try:
