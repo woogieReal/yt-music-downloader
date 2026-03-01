@@ -78,6 +78,7 @@ class ID3TagPostProcessor(PostProcessor):
                 if playlist_thumb:
                     try:
                         audio_id3 = ID3(filepath)
+                        audio_id3.delall('APIC') # Remove existing track thumbnail
                         with open(playlist_thumb, 'rb') as img_file:
                             mime = 'image/jpeg' if playlist_thumb.lower().endswith(('.jpg', '.jpeg')) else 'image/png'
                             audio_id3.add(APIC(
@@ -87,7 +88,7 @@ class ID3TagPostProcessor(PostProcessor):
                                 desc=u'Cover',
                                 data=img_file.read()
                             ))
-                        audio_id3.save()
+                        audio_id3.save(v2_version=3)
                     except Exception as e:
                         self.print_func(f"[dim red]Failed to apply playlist cover to {filepath}: {e}[/dim red]")
 
