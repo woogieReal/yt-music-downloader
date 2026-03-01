@@ -78,23 +78,6 @@ python main.py "https://www.youtube.com/watch?v=YOUR_VIDEO_ID"
 python main.py "https://www.youtube.com/playlist?list=YOUR_PLAYLIST_ID"
 ```
 
-### (New) 여러 개의 URL 일괄 다운로드
-
-프로젝트 폴더 내에 `items.txt` 파일을 생성하고, 다운로드할 URL들을 한 줄씩 입력한 후, 매개변수 없이 `main.py`를 실행하세요.
-
-1. `items.txt` 내용 예시:
-
-```txt
-https://music.youtube.com/playlist?list=OLAK5uy_lSogrSY4JibkASVaZt-QVeJ2TDMFrGREc&si=zcNOeoPV2le_d8bv
-https://music.youtube.com/playlist?list=OLAK5uy_nwZ6zMHtubNwcxA5oWIwfMz7DDtjv7OtY&si=OKOwso8NjTeWskaE
-```
-
-1. 명령어 실행:
-
-```bash
-python main.py
-```
-
 ### (New) ID3 태그 수동 수정
 
 이미 다운로드된 MP3 파일 또는 디렉터리 내의 모든 MP3 파일에 대해 ID3 태그를 수동으로 입력하거나 수정하고 싶을 때 `edit_tags.py`를 사용합니다.
