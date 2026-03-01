@@ -194,6 +194,7 @@ class YouTubeDownloaderApp(App):
         if event.button.id == "back_button":
             # 1. Reset widgets
             self.query_one("#url_input", Input).value = ""
+            self.query_one("#use_playlist_thumb", Checkbox).value = False
             self.query_one("#manual_metadata_checkbox", Checkbox).value = False
             self.query_one("#meta_artist", Input).value = ""
             self.query_one("#meta_album", Input).value = ""
