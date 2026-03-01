@@ -2,6 +2,7 @@ import argparse
 import sys
 from ytmd.downloader import fetch_info, download_media
 from ytmd.ui import display_summary_table
+from ytmd.tui import get_url_from_ui
 from rich import print
 
 def process_url(url: str):
@@ -31,11 +32,20 @@ def process_url(url: str):
 
 def main():
     parser = argparse.ArgumentParser(description="YouTube MP3 Downloader CLI")
-    parser.add_argument("url", help="YouTube Video or Playlist URL")
+    parser.add_argument("url", nargs="?", help="YouTube Video or Playlist URL (Optional, opens UI if omitted)")
     
     args = parser.parse_args()
     
-    process_url(args.url)
+    url = args.url
+    if not url:
+        # Load the TUI to get the URL
+        url = get_url_from_ui()
+        
+    if not url:
+        print("[yellow]No URL provided. Exiting.[/yellow]")
+        sys.exit(0)
+        
+    process_url(url)
 
 if __name__ == "__main__":
     main()
