@@ -231,10 +231,26 @@ def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, p
                 with urllib.request.urlopen(req) as response, open(temp_path, 'wb') as out_file:
                     out_file.write(response.read())
                     
-                local_custom_image_path = temp_path
-                is_temp_image = True
+                def is_valid_image(filepath):
+                    with open(filepath, 'rb') as f:
+                        header = f.read(12)
+                    if header.startswith(b'\xff\xd8\xff'): return True # JPEG
+                    if header.startswith(b'\x89PNG\r\n\x1a\n'): return True # PNG
+                    if header.startswith(b'GIF8'): return True # GIF
+                    if header.startswith(b'RIFF') and len(header) >= 12 and header[8:12] == b'WEBP': return True # WebP
+                    return False
+                
+                if not is_valid_image(temp_path):
+                    if print_func: print_func(f"[bold red]오류: 입력한 URL은 유효한 이미지 파일이 아닙니다. (웹페이지 URL 대신 이미지 주소 복사를 사용해주세요)[/bold red]")
+                    try:
+                        os.remove(temp_path)
+                    except:
+                        pass
+                else:
+                    local_custom_image_path = temp_path
+                    is_temp_image = True
             except Exception as e:
-                if print_func: print_func(f"[red]Failed to download custom image: {e}[/red]")
+                if print_func: print_func(f"[red]커스텀 이미지 다운로드 실패: {e}[/red]")
         else:
             local_custom_image_path = custom_image_path.replace('\\ ', ' ')
             
