@@ -237,6 +237,32 @@ def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, p
                 if print_func: print_func(f"[red]Failed to download custom image: {e}[/red]")
         else:
             local_custom_image_path = custom_image_path.replace('\\ ', ' ')
+            
+            # WSL Path Conversion for Windows dragged paths
+            is_wsl = False
+            try:
+                with open('/proc/version', 'r') as f:
+                    if 'microsoft' in f.read().lower():
+                        is_wsl = True
+            except:
+                pass
+            
+            import platform
+            if is_wsl or 'microsoft' in platform.uname().release.lower():
+                import re
+                wsl_win_path = local_custom_image_path
+                if re.match(r'^/[a-zA-Z]:/', wsl_win_path):
+                    wsl_win_path = wsl_win_path[1:]
+                
+                if re.match(r'^[a-zA-Z]:[/\\]', wsl_win_path):
+                    import subprocess
+                    win_path = wsl_win_path.replace('/', '\\')
+                    try:
+                        result = subprocess.run(['wslpath', '-u', win_path], capture_output=True, text=True, check=True)
+                        local_custom_image_path = result.stdout.strip()
+                    except Exception:
+                        pass
+
             if not os.path.exists(local_custom_image_path) and os.path.exists(custom_image_path):
                 local_custom_image_path = custom_image_path
 
