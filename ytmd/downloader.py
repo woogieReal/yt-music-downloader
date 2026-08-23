@@ -3,6 +3,22 @@ from yt_dlp.postprocessor.common import PostProcessor
 from typing import Dict, Any
 import os
 import re
+import sys
+import shutil
+
+# Adjust PATH on macOS to find homebrew's ffmpeg/ffprobe
+if sys.platform == 'darwin':
+    extra_paths = ['/opt/homebrew/bin', '/usr/local/bin']
+    current_path = os.environ.get('PATH', '')
+    paths = current_path.split(os.pathsep)
+    path_changed = False
+    for p in extra_paths:
+        if p not in paths and os.path.exists(p):
+            paths.append(p)
+            path_changed = True
+    if path_changed:
+        os.environ['PATH'] = os.pathsep.join(paths)
+
 
 class ID3TagPostProcessor(PostProcessor):
     def __init__(self, downloader=None, collector: Dict[str, Any] = None, print_func=None, update_tags_func=None, use_playlist_thumb=False, manual_meta: Dict[str, str] = None, custom_image_path: str = None):
@@ -155,7 +171,7 @@ def get_base_ydl_opts() -> Dict[str, Any]:
     """
     Get the yt-dlp configuration for MP3 192kbps extraction.
     """
-    return {
+    opts = {
         'format': 'bestaudio/best',
         'writethumbnail': True,
         'postprocessors': [
@@ -175,6 +191,12 @@ def get_base_ydl_opts() -> Dict[str, Any]:
         'ignoreerrors': True, # Skip unavailable videos
         'updatetime': False,
     }
+    
+    if shutil.which('node'):
+        opts['js_runtime'] = 'node'
+        
+    return opts
+
 
 def download_media(url: str, info_dict: Dict[str, Any], progress_manager=None, print_func=None, update_tags_func=None, use_playlist_thumb=False, manual_meta: Dict[str, str] = None, custom_image_path: str = None) -> None:
     """
