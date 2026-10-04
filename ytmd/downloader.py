@@ -192,9 +192,32 @@ def get_base_ydl_opts() -> Dict[str, Any]:
         'updatetime': False,
     }
     
-    if shutil.which('node'):
-        opts['js_runtime'] = 'node'
+    opts.update(get_js_challenge_opts())
         
+    return opts
+
+
+def get_js_challenge_opts() -> Dict[str, Any]:
+    """
+    YouTube 서명(signature)/n 챌린지 해결을 위한 JS 런타임 및 솔버 스크립트 설정.
+    
+    yt-dlp는 기본적으로 deno만 활성화하므로, 설치된 다른 런타임(node 등)을
+    명시적으로 등록해야 한다. 런타임이 없거나 솔버 스크립트가 없으면
+    대부분의 영상에서 "This video is not available" 오류가 발생한다.
+    """
+    js_runtimes = {}
+    # yt-dlp 우선순위 순서: deno > node > quickjs > bun
+    for runtime in ('deno', 'node', 'quickjs', 'bun'):
+        path = shutil.which(runtime)
+        if path:
+            js_runtimes[runtime] = {'path': path}
+    
+    opts: Dict[str, Any] = {
+        # yt-dlp-ejs 패키지가 없을 경우 GitHub에서 솔버 스크립트를 받아오도록 허용
+        'remote_components': ['ejs:github'],
+    }
+    if js_runtimes:
+        opts['js_runtimes'] = js_runtimes
     return opts
 
 
